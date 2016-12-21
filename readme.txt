@@ -12,8 +12,8 @@ Reduce image file sizes and improve performance using Linux image optimization p
 
 CW Image Optimizer Advanced is a WordPress plugin that will automatically, both losslessly or lossy optimize your images as you upload them to your blog. It can also optimize the images that you have already uploaded in the past.
 
-CW Image Optimizer Advanced uses both lossless optimization and lossy techniques, the latter one as a fallback (ImageMagick) if no 
- your image quality will be exactly the same before and after the optimization. The only thing that will change is your file size.
+CW Image Optimizer Advanced uses both lossless optimization and lossy techniques, the latter one as a fallback (ImageMagick) if none of the littleutils binaries is available.
+With the lossless image optimizers, your image quality will be exactly the same before and after the optimization. The only thing that will change is your file size.
 
 The CW Image Optimizer Advanced plugin is based on the WP Smush.it plugin. Unlike the WP Smush.it plugin, your files won’t be uploaded to a third party when using CW Image Optimizer. Your files are optimized using the Linux [littleutils](http://sourceforge.net/projects/littleutils/) image optimization tools (available for free). You don’t need to worry about the Smush.it privacy policy or terms of service because your images never leave your server.
 
@@ -30,19 +30,6 @@ The CW Image Optimizer Advanced plugin is based on the WP Smush.it plugin. Unlik
 1. Upload the 'cw-io-advanced' plugin to your '/wp-content/plugins/' directory.
 1. Activate the plugin through the 'Plugins' menu in WordPress.
 1. Done!
-
-= Installing littleutils: Ubuntu 14.04.3 LTS (64-bit) =
-
-These instructions were tested with littleutils 1.0.27 and Ubuntu 14.04 LTS (64-bit, desktop edition).
-
-1. Download the latest version of [littleutils](http://sourceforge.net/projects/littleutils/) to your Download directory
-1. Open a terminal window (Applications -> Accessories -> Terminal)
-1. Move the download to a better location: *sudo mv ~/Downloads/littleutils-1.0.27.tar.bz2 /usr/local/src/*
-1. Install dependencies: *sudo apt-get install gifsicle pngcrush lzip libpng12-0 libpng12-dev libjpeg-progs p7zip-full*
-1. Uncompress littleutils: *cd /usr/local/src && tar jxvf littleutils-1.0.27.tar.bz2 && cd littleutils-1.0.27*
-1. Configure and compile littleutils: *./configure --prefix=/usr && make*
-1. Install littleutils locally: *make install && make install-extra* (add *sudo* before both make calls to install for every user)
-
 
 = Installing littleutils: GNU/Debian =
 
