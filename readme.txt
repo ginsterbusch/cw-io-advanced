@@ -125,6 +125,7 @@ CW Image Optimizer Advanced expects *opt-jpg*, *opt-png*, and *opt-gif* to be in
 * Removed OS check (because ImageMagick is available cross-platform)
 * Added plugin activation hook
 * Added simple internal settings handling API
+* Added file size column to media library overview
 
 = 1.1.10 =
 * Fix exec check on some systems.

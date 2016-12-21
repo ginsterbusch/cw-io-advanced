@@ -7,7 +7,7 @@
 /*
 Plugin Name: CW Image Optimizer Advanced
 Plugin URI: http://f2w.de/cw-io-advanced
-Description: Reduce image file sizes and improve performance using Linux image optimizers within WordPress. Adapted version of CW Image Optimized, which is using ImageMagick as fallback option.
+Description: Reduce image file sizes and improve performance using Linux image optimizers within WordPress. Fork of CW Image Optimizer, which is using ImageMagick as fallback option.
 Author: Fabian Wolf
 Version: 1.2
 Author URI: http://usability-idealist.de
