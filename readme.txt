@@ -167,4 +167,5 @@ CW Image Optimizer Advanced expects *opt-jpg*, *opt-png*, and *opt-gif* to be in
 
 == Contact and Credits ==
 
-Written by [Jacob Allred](http://www.jacoballred.com/) at [Corban Works, LLC](http://www.corbanworks.com/). Based on WP Smush.it.
+Forked and enhanced by [Fabian Wolf of Usability Idealist](http://usability-idealist.de/).
+Based on CW Image Optimizer by [Jacob Allred](http://www.jacoballred.com/) at [Corban Works, LLC](http://www.corbanworks.com/) and WP Smush.it.
