@@ -1,5 +1,5 @@
 <div class="wrap"> 
-<div id="icon-upload" class="icon32"><br /></div><h2>Bulk CW Image Optimize </h2>
+<div id="icon-upload" class="icon32"><br /></div><h2>Bulk <?php echo $strPluginName; ?></h2>
 
 <?php 
 

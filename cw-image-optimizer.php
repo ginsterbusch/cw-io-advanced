@@ -53,6 +53,10 @@ class _ui_io_base {
 	
 
 	public static function plugin_install() {
+		 if ( ! current_user_can( 'activate_plugins' ) ) {
+			return;
+		}
+		
 		// check if there are already options in place
 		$test_option = get_option( self::optionName, false );
 		
@@ -82,7 +86,7 @@ class _ui_io_base {
 				'fallback' => false,
 			),
 			'quality_jpg' => 75,
-			'quality_png' => 4,
+			'quality_png' => 50,
 		);
 		
 		return $defaults;
@@ -90,7 +94,7 @@ class _ui_io_base {
 
 	public static function get_settings( $option_name = '', $default_value = null ) {
 	
-		$options = get_option( 'cw_io_settings', self::get_default_settings() );
+		$options = get_option( self::optionName, self::get_default_settings() );
 		
 		$return = $options;
 		
@@ -111,7 +115,7 @@ class _ui_io_base {
 		if( !empty( $settings ) ) {
 			//new __debug( $settings, __METHOD__ );
 			
-			$return = update_option( 'cw_io_settings', $settings );
+			$return = update_option( self::optionName, $settings );
 		}
 		
 		return $return;
@@ -120,7 +124,7 @@ class _ui_io_base {
 	public static function update_setting( $option_name = '', $value = '' ) {
 		$return = false;
 		
-		$options = get_option( 'cw_io_settings', self::get_default_settings() );
+		$options = get_option( self::optionName, self::get_default_settings() );
 		$update_options = $options;
 		
 		if( !empty( $option_name ) && isset( $options[ $option_name ] ) && $options[ $option_name ] != $value ) {
@@ -128,7 +132,7 @@ class _ui_io_base {
 		}
 		
 		if( $update_options != $options ) {
-			$return = update_option( 'cw_io_settings', $update_options );
+			$return = update_option( self::optionName, $update_options );
 		}
 		
 		return $return;
@@ -210,7 +214,7 @@ class _ui_io_base {
 
 
 add_action('init', array( '_ui_io_admin', 'init' ) );
-add_action('admin_action_cw_image_optimizer_manual', 'cw_image_optimizer_manual' );
+add_action('admin_action_cw_io_manual', 'cw_io_manual_call' );
 
 class _ui_io_admin extends _ui_io_base {
 	public static function init() {
@@ -274,7 +278,7 @@ class _ui_io_admin extends _ui_io_base {
 		//$strSectionPageSlug = 'cw_io_quality_settings';
 		
 		add_settings_field( 'field-quality_jpg', 'JPEG quality', array( $this, 'admin_field_quality_jpg' ), $strSectionPageSlug, $strSectionID );
-		add_settings_field( 'field-quality_png', 'PNG quality', array( $this, 'admin_field_quality_png' ), $strSectionPageSlug, $strSectionID );
+		add_settings_field( 'field-quality_png', 'PNG level of compression', array( $this, 'admin_field_quality_png' ), $strSectionPageSlug, $strSectionID );
 		
 		
 		//add_settings_section( $strSectionID, self::pluginName . ' Settings', array( $this, 'admin_section_main' ), $strSectionPageSlug );
@@ -320,23 +324,18 @@ class _ui_io_admin extends _ui_io_base {
 	}
 	
 	function admin_field_quality_jpg() {
-		$quality = self::get_settings( 'quality_jpg' );
 		$default = 75;
-		if( empty( $quality ) ) {
-			$quality = $default;
-		}
+		$quality = self::get_settings( 'quality_jpg', $default );
+		
 		?>
 		<input type="number" class="small-text" id="field-quality_jpg" name="<?php echo $this->strOptionName . '[quality_jpg]'; ?>" value="<?php echo $quality; ?>" min="10" step="1" max="100" /> <span class="description">Quality in percent (10 - 100%; defaults to <?php echo $default; ?>%)</span><?php
 	}
 	
 	function admin_field_quality_png() {
-		$quality = self::get_settings( 'quality_png' );
-		$default = 4;
-		if( empty( $quality ) ) {
-			$quality = $default;
-		}
+		$default = 50;
+		$quality = self::get_settings( 'quality_png', $default );
 		
-		?><input type="number" class="small-text" id="field-quality_png" name="<?php echo $this->strOptionName . '[quality_png]'; ?>" class="regular-text" value="<?php echo $quality; ?>" /><?php
+		?><input type="number" class="small-text" id="field-quality_png" name="<?php echo $this->strOptionName . '[quality_png]'; ?>" class="regular-text" value="<?php echo $quality; ?>" min="1" max="100" step="1"/> <span class="description"><a href="http://www.howtogeek.com/203979/is-the-png-format-lossless-since-it-has-a-compression-parameter/">Quality of compression</a> in percent (1 - 100%; defaults to <?php echo $default; ?>%)</span><?php
 	}
 
 	function admin_validate_settings( $input ) {
@@ -373,8 +372,31 @@ class _ui_io_admin extends _ui_io_base {
 						//}
 						//}
 					}
-				} elseif( strpos( $strName, 'quality_' ) !== false ) {
-					$return[ $strName ] = intval( $value );
+				/**
+				 * NOTE: Quality behaviour of JPEG and PNG is vice-versa, but they are using the same scale (1 - 100). Also see @link http://www.howtogeek.com/203979/is-the-png-format-lossless-since-it-has-a-compression-parameter/
+				 */
+					
+				} elseif( $strName == 'quality_jpg' ) {
+					
+					if( !empty( $value ) ) {
+						$sanitized_value = intval( $value );
+						
+							
+						if( !empty( $sanitized_value ) && $sanitized_value > 9 && $sanitized_value <= 100 ) {
+							$return[ $strName ] = $sanitized_value;
+						}
+					}
+				} elseif( $strName == 'quality_png' ) {
+					
+					if( !empty( $value ) ) {
+						$sanitized_value = intval( $value );
+							
+						if( !empty( $sanitized_value ) && $sanitized_value >= 1 && $sanitized_value <= 100 ) {
+							$return[ $strName ] = $sanitized_value;
+						}
+					}
+
+
 				} else {
 					if( isset( $input[ $strName] ) && $input[ $strName ] != $value ) {
 						$return[ $strName ] = $value;
@@ -510,7 +532,7 @@ class _ui_io_admin extends _ui_io_base {
 	}
 
 
-	public static function bulk_preview() {
+	function bulk_preview() {
 	  if ( function_exists( 'apache_setenv' ) ) {
 		@apache_setenv('no-gzip', 1);
 	  }
@@ -522,6 +544,9 @@ class _ui_io_admin extends _ui_io_base {
 		'post_type' => 'attachment',
 		'post_mime_type' => 'image'
 	  ));
+	  
+	  $strPluginName = self::pluginName;
+	  
 	  require( dirname(__FILE__) . '/bulk.php' );
 	}
 	
@@ -638,12 +663,12 @@ class _ui_io_admin extends _ui_io_base {
 
 			if ( isset($data['cw_image_optimizer']) && !empty($data['cw_image_optimizer']) ) {
 				print $data['cw_image_optimizer'];
-				printf("<br><a href=\"admin.php?action=cw_image_optimizer_manual&amp;attachment_ID=%d\">%s</a>",
+				printf("<br><a href=\"admin.php?action=cw_io_manual&amp;id=%d\">%s</a>",
 						 $id,
 						 __('Re-optimize', CW_IMAGE_OPTIMIZER_DOMAIN));
 			} else {
 				print __('Not processed', CW_IMAGE_OPTIMIZER_DOMAIN);
-				printf("<br><a href=\"admin.php?action=cw_image_optimizer_manual&amp;attachment_ID=%d\">%s</a>",
+				printf("<br><a href=\"admin.php?action=cw_io_manual&amp;id=%d\">%s</a>",
 						 $id,
 						 __('Optimize now!', CW_IMAGE_OPTIMIZER_DOMAIN));
 			}
@@ -704,21 +729,24 @@ class _ui_io_admin extends _ui_io_base {
 /**
  * Manually process an image from the Media Library
  */
-function cw_image_optimizer_manual() {
+function cw_io_manual_call() {
 	if ( FALSE === current_user_can('upload_files') ) {
 		wp_die(__('You don\'t have permission to work with uploaded files.', CW_IMAGE_OPTIMIZER_DOMAIN));
 	}
 
-	if ( FALSE === isset($_GET['attachment_ID'])) {
+	if ( FALSE === isset($_GET['attachment_ID']) && FALSE === isset($_GET['id']) ) {
 		wp_die(__('No attachment ID was provided.', CW_IMAGE_OPTIMIZER_DOMAIN));
 	}
 
-	$attachment_ID = intval($_GET['attachment_ID']);
+	if( !empty( $_GET['attachment_ID'] ) || !empty( $_GET['id'] ) ) {
 
-	$original_meta = wp_get_attachment_metadata( $attachment_ID );
+		$attachment_id = ( !empty( $_GET['attachment_ID'] ) ? absint($_GET['attachment_ID']) : absint( $_GET['id'] ) );
+	}
 
-	$new_meta = cw_image_optimizer_resize_from_meta_data( $original_meta, $attachment_ID );
-	wp_update_attachment_metadata( $attachment_ID, $new_meta );
+	$original_meta = wp_get_attachment_metadata( $attachment_id );
+
+	$new_meta = cw_image_optimizer_resize_from_meta_data( $original_meta, $attachment_id );
+	wp_update_attachment_metadata( $attachment_id, $new_meta );
 
 	$sendback = wp_get_referer();
 	$sendback = preg_replace('|[^a-z0-9-~+_.?#=&;,/:]|i', '', $sendback);
