@@ -99,6 +99,7 @@ CW Image Optimizer Advanced expects *opt-jpg*, *opt-png*, and *opt-gif* to be in
 
 1. Additional optimize column added to media listing. You can see your savings, or manually optimize individual images.
 2. Bulk optimization page. You can optimize all your images at once. This is very useful for existing blogs that have lots of images.
+3. Configuration dialogue page. Enables you to customize the optimizer paths if auto-detection fails, and fine-tune the quality (of compression) levels for PNG and JPEG, too.
 
 == Changelog ==
 

@@ -5,11 +5,11 @@
  * @package CW_Image_Optimizer
  */
 /*
-Plugin Name: CW Image Optimizer Advanced
+Plugin Name: UI Image Optimizer
 Plugin URI: http://f2w.de/cw-io-advanced
 Description: Reduce image file sizes and improve performance using Linux image optimizers within WordPress. Fork of CW Image Optimizer, which is using ImageMagick as fallback option.
 Author: Fabian Wolf
-Version: 1.2
+Version: 1.3
 Author URI: http://usability-idealist.de
 */
 
@@ -19,10 +19,7 @@ Author URI: http://usability-idealist.de
 define('CW_IMAGE_OPTIMIZER_DOMAIN', 'cw_image_optimizer');
 define('CW_IMAGE_OPTIMIZER_PLUGIN_DIR', dirname(plugin_basename(__FILE__)));
 define('_UI_IO_NAME', 'CW Image Optimizer Advanced');
-/**
- * Hooks
- */
-add_filter('wp_generate_attachment_metadata', 'cw_image_optimizer_resize_from_meta_data', 10, 2);
+
 
 
 /**
@@ -50,6 +47,8 @@ class _ui_io_base {
 	const pluginName = 'CW Image Optimizer Advanced';
 	const pluginVersion = '1.2';
 	const optionName = 'cw_io_settings';
+	const pluginPrefix = '_ui_io_';
+	const pluginPrefixCompat = 'cw_image_optimizer_';
 	
 
 	public static function plugin_install() {
@@ -148,6 +147,7 @@ class _ui_io_base {
 			'jpg' => 'opt-jpg',
 			'gif' => 'opt-gif',
 			'fallback' => 'convert',
+			
 		);
 
 		foreach($required as $key => $req) {
@@ -214,15 +214,17 @@ class _ui_io_base {
 
 
 add_action('init', array( '_ui_io_admin', 'init' ) );
-add_action('admin_action_cw_io_manual', 'cw_io_manual_call' );
+add_action('admin_action_cw_io_manual', array( '_ui_io_resizer', 'manual_call' ) );
 
 class _ui_io_admin extends _ui_io_base {
+	public $notice_transient = '_ui_io_notice_dismissed';
+	public $cookie_key = self::pluginPrefix . 'warning_dismissed';
+	public $strOptionName = 'cw_io_settings';
+			
 	public static function init() {
 		new self();
 	}
 
-	public $strOptionName = 'cw_io_settings';
-	
 	function __construct() {
 		
 		add_action('admin_notices', array( $this, 'add_notice_littleutils') );
@@ -501,32 +503,60 @@ class _ui_io_admin extends _ui_io_base {
 			$tools = $settings['tools'];
 		}
 
+		$notice_dissmissed = get_transient( $this->notice_transient );
+		$cookie_key = $this->cookie_key;
+		
+
 		// To skip binary checking, define CW_IMAGE_OPTIMIZER_SKIP_CHECK in your wp-config.php
-		if( (defined('CW_IMAGE_OPTIMIZER_SKIP_CHECK') && CW_IMAGE_OPTIMIZER_SKIP_CHECK) || !empty( $settings['skip_check'] ) ) {
+		if( (defined('CW_IMAGE_OPTIMIZER_SKIP_CHECK') && CW_IMAGE_OPTIMIZER_SKIP_CHECK) || !empty( $settings['skip_check'] ) || !empty( $notice_dissmissed ) ) {
 			$skip = true;
 		}		
 		
-		$result = self::detect_tools();
+		/**
+		 * FIXME: $cookie_key is not set!
+		 */
 		
-		$msg = implode(', ', $result['missing'] );
-		$cookie_key = 'cw-io-warning-dismissed';
-
-		if(!empty($msg) && empty($_COOKIE[ $cookie_key ]) ) {
-			echo '<div id="cw-image-optimizer-warning-opt-png" class="updated notice is-dismissible fade"><p><strong>' . self::pluginName . ' requires <a href="http://sourceforge.net/projects/littleutils/">littleutils</a> or ImageMagick.</strong> You are missing: ' . $msg . '.</p><button class="notice-dismiss" type="button"><span class="screen-reader-text">Dismiss this notice.</span></button></div>';
-			
-			?>
-			<script>jQuery('#cw-image-optimizer-warning-opt-png').on('click', function() {
-				document.cookie = '<?php echo $cookie_key . '=1'; ?>';
-			});</script>
-			<?php
-			
-			//<div class="updated notice is-dismissible" id="message"><p>Plugin <strong>activated</strong>.</p><button class="notice-dismiss" type="button"><span class="screen-reader-text">Dismiss this notice.</span></button></div>
+		if( !empty( $_COOKIE[ $cookie_key ] ) || !empty( $_GET[ $cookie_key ] ) ) {
+			set_transient( $this->notice_transient, true );
 		}
+		
+		if( empty( $skip ) ) {
+			$result = self::detect_tools();
+			
+			$msg = implode(', ', $result['missing'] );
+			$cookie_key = 'cw-io-warning-dismissed';
+			$notice_id = 'cw-image-optimizer-warning-opt-png';
 
-		// Check if exec is disabled
-		$disabled = array_map('trim', explode(',', ini_get('disable_functions')));
-		if(in_array('exec', $disabled)){
-			echo '<div id="cw-image-optimizer-warning-opt-png" class="updated fade"><p><strong>' . self::pluginName . ' requires exec().</strong> Your system administrator has disabled this function.</p></div>';
+			if( !empty($msg) && empty( $_COOKIE[ $cookie_key ] ) ) { ?>
+				
+			<div id="<?php echo $notice_id; ?>" class="notice notice-warning is-dismissible fade">
+				<p><strong><?php 
+				printf( __('%1$s requires <a href="%2$s">littleutils</a> or <a href="%3$s">ImageMagick</a>.', CW_IMAGE_OPTIMIZER_DOMAIN ), self::pluginName, 'http://sourceforge.net/projects/littleutils/', 'http://imagemagick.org' ); ?></strong>
+				
+				<?php 
+				printf( __('You are missing: %s', CW_IMAGE_OPTIMIZER_DOMAIN ),  $msg  );
+				?>
+				</p><button class="notice-dismiss" type="button"><span class="screen-reader-text sr-only"><?php _e('Dismiss this notice.'); ?></span></button>
+				
+			</div>
+		
+			<script>
+			jQuery( '<?php echo '#' . $notice_id; ?>').on('click', function() {
+				
+				document.cookie = '<?php echo $cookie_key . '=1'; ?>';
+			});
+			</script>
+			<?php
+				
+				//<div class="updated notice is-dismissible" id="message"><p>Plugin <strong>activated</strong>.</p><button class="notice-dismiss" type="button"><span class="screen-reader-text">Dismiss this notice.</span></button></div>
+			}
+
+			// Check if exec is disabled
+			$disabled = array_map('trim', explode(',', ini_get('disable_functions')));
+			if( in_array('exec', $disabled, true ) ) { ?>
+				<div id="<?php echo $notice_id; ?>" class="notice notice-warning is-dissimisble fade"><p><strong><?php printf( __( '<strong>%s requires exec().</strong> Your system administrator has disabled this function.', CW_IMAGE_OPTIMIZER_DOMAIN ), self::pluginName ); ?></p></div>
+			<?php
+			}
 		}
 
 	}
@@ -668,7 +698,7 @@ class _ui_io_admin extends _ui_io_base {
 						 __('Re-optimize', CW_IMAGE_OPTIMIZER_DOMAIN));
 			} else {
 				print __('Not processed', CW_IMAGE_OPTIMIZER_DOMAIN);
-				printf("<br><a href=\"admin.php?action=cw_io_manual&amp;id=%d\">%s</a>",
+				printf('<br><a href="admin.php?action=cw_io_manual&amp;id=%d">%s</a>',
 						 $id,
 						 __('Optimize now!', CW_IMAGE_OPTIMIZER_DOMAIN));
 			}
@@ -727,220 +757,210 @@ class _ui_io_admin extends _ui_io_base {
 
 
 /**
- * Manually process an image from the Media Library
+ * Hooks
  */
-function cw_io_manual_call() {
-	if ( FALSE === current_user_can('upload_files') ) {
-		wp_die(__('You don\'t have permission to work with uploaded files.', CW_IMAGE_OPTIMIZER_DOMAIN));
-	}
-
-	if ( FALSE === isset($_GET['attachment_ID']) && FALSE === isset($_GET['id']) ) {
-		wp_die(__('No attachment ID was provided.', CW_IMAGE_OPTIMIZER_DOMAIN));
-	}
-
-	if( !empty( $_GET['attachment_ID'] ) || !empty( $_GET['id'] ) ) {
-
-		$attachment_id = ( !empty( $_GET['attachment_ID'] ) ? absint($_GET['attachment_ID']) : absint( $_GET['id'] ) );
-	}
-
-	$original_meta = wp_get_attachment_metadata( $attachment_id );
-
-	$new_meta = cw_image_optimizer_resize_from_meta_data( $original_meta, $attachment_id );
-	wp_update_attachment_metadata( $attachment_id, $new_meta );
-
-	$sendback = wp_get_referer();
-	$sendback = preg_replace('|[^a-z0-9-~+_.?#=&;,/:]|i', '', $sendback);
-	wp_redirect($sendback);
-	exit(0);
-}
+add_filter('wp_generate_attachment_metadata', array( '_ui_io_resizer', 'resize_from_meta_data' ), 10, 2);
 
 /**
- * Process an image.
- *
- * Returns an array of the $file $results.
- *
- * @param   string $file            Full absolute path to the image file
- * @returns array
+ * Manually process an image from the Media Library
  */
-function cw_image_optimizer($file, $quality = '') {
-	// don't run on localhost, IPv4 and IPv6 checks
-	// if( in_array($_SERVER['SERVER_ADDR'], array('127.0.0.1', '::1')) )
-	//	return array($file, __('Not processed (local file)', CW_IMAGE_OPTIMIZER_DOMAIN));
+add_action( 'plugins_loaded', array( '_ui_io_resizer', 'init' ), 1 );
 
-	// canonicalize path - disabled 2011-02-1 troubleshooting 'Could not find...' errors.
-	// From the PHP docs: "The running script must have executable permissions on 
-	// all directories in the hierarchy, otherwise realpath() will return FALSE."
-	// $file_path = realpath($file);
-	$tools = _ui_io_base::get_settings( 'tools' );
-	
-	$file_path = $file;
-
-	// check that the file exists
-	if ( FALSE === file_exists($file_path) || FALSE === is_file($file_path) ) {
-		$msg = sprintf(__("Could not find <span class='code'>%s</span>", CW_IMAGE_OPTIMIZER_DOMAIN), $file_path);
-		return array($file, $msg);
-	}
-
-	// check that the file is writable
-	if ( FALSE === is_writable($file_path) ) {
-		$msg = sprintf(__("<span class='code'>%s</span> is not writable", CW_IMAGE_OPTIMIZER_DOMAIN), $file_path);
-		return array($file, $msg);
-	}
-
-	// check that the file is within the WP_CONTENT_DIR
-	$upload_dir = wp_upload_dir();
-	$wp_upload_dir = $upload_dir['basedir'];
-	$wp_upload_url = $upload_dir['baseurl'];
-	if ( 0 !== stripos(realpath($file_path), realpath($wp_upload_dir)) ) {
-		$msg = sprintf(__("<span class='code'>%s</span> must be within the content directory (<span class='code'>%s</span>)", CW_IMAGE_OPTIMIZER_DOMAIN), htmlentities($file_path), $wp_upload_dir);
-
-		return array($file, $msg);
-	}
-
-    if(function_exists('getimagesize')){
-        $type = getimagesize($file_path);
-        if(false !== $type){
-            $type = $type['mime'];
-        }
-    }elseif(function_exists('mime_content_type')){
-        $type = mime_content_type($file_path);
-    }else{
-        $type = 'Missing getimagesize() and mime_content_type() PHP functions';
-    }
-	
-	$file_copy = '';
-	$params = '';
-	$old_size = 0;
-	
-    switch($type){
-        case 'image/jpeg':
-			$command = 'opt-jpg';
-			$command = $tools[ 'jpg' ];
-			
-			//if( CW_IMAGE_OPTIMIZER_JPG == false && defined( 'CW_IMAGE_OPTIMIZER_FALLBACK' ) && CW_IMAGE_OPTIMIZER_FALLBACK !== false ) {
-			if( empty( $tools[ 'jpg' ] ) && !empty( $tools['fallback'] ) ) {	
-				
-				$command = $tools['fallback'];
-				$params = ' %s -quality %d %s';
-				
-				//$file_copy = pathinfo( $file , PATHINFO_FILENAME ) . '.bak.' . pathinfo( $file , PATHINFO_EXTENSION );
-				
-				$file_path = pathinfo( $file );
-				
-				$file_copy = trailingslashit( $file_path['dirname'] ) . $file_path['filename'] . '.bak.' . $file_path['extension'];
-				
-				if( empty( $quality ) ) {
-					$quality = '75%';
-				}
-			}
-
-			break;
-		case 'image/png':
-			$command = 'opt-png';
-			$command = $tools[ 'png' ];
-			
-			if( empty( $tools[ 'png' ] ) && !empty( $tools['fallback'] ) ) {
-				$command = $tools['fallback'];
-				$params = ' %s -quality %s %s ';
-				$file_path = pathinfo( $file );
-				
-				$file_copy = trailingslashit( $file_path['dirname'] ) . $file_path['filename'] . '.bak.' . $file_path['extension'];
-				
-				if( empty( $quality ) ) {
-					$quality = '4';
-				}
-			}
-
-			break;
-		case 'image/gif':
-			$command = 'opt-gif';
-			break;
-		default:
-			return array($file, __('Unknown type: ' . $type, CW_IMAGE_OPTIMIZER_DOMAIN));
-			break;
-    }
-
-	if( !empty( $params ) ) {
+class _ui_io_resizer extends _ui_io_base {
+	public static function init( $return_object = true ) {
+		$return = $GLOBALS[ '_ui_image_optimizer']  = new self();
 		
-		if( empty( $old_size ) ) {
-			$old_size = filesize( $file );
+		if( !empty( $return_object ) ) {
+			return $return;
 		}
+	}
+	
+	function __construct( $plugin_init = true ) {
 		
-		if( empty( $file_copy ) ) {
-			$file_copy = $file;
+		if( !empty( $plugin_init ) ) {
+		
+			add_action( 'admin_action_cw_io_manual', array( $this, 'manual_call' ) );
+			add_action( 'admin_action_ui_io_manual', array( $this, 'manual_call' ) );
 		}
-		
-		$strCommand = $command . ' ' . sprintf( $params, $file_copy, $quality, $file );
-		
-		//new __debug( array('file_copy' => $file_copy, 'file' => $file, 'old_size' => $old_size, 'cli' => $strCommand ), 'running convert' );
-		
-		//$result = exec( $command . ' ' . sprintf( $params, $file, $quality, $file_copy  ) );
-		if( $file_copy != $file ) { // switch files before processing them
-			copy( $file, $file_copy );
+	}
+	
+	function manual_call() {
+		if ( FALSE === current_user_can('upload_files') ) {
+			wp_die(__('You don\'t have permission to work with uploaded files.', CW_IMAGE_OPTIMIZER_DOMAIN));
 		}
-		
-		$result = exec( $strCommand );
-		
-		
-	
-	} else {
-		$result = exec($command . ' ' . escapeshellarg($file));
 
-		$result = str_replace($file . ': ', '', $result);
+		if ( FALSE === isset($_GET['attachment_ID']) && FALSE === isset($_GET['id']) ) {
+			wp_die(__('No attachment ID was provided.', CW_IMAGE_OPTIMIZER_DOMAIN));
+		}
 
+		if( !empty( $_GET['attachment_ID'] ) || !empty( $_GET['id'] ) ) {
+
+			$attachment_id = ( !empty( $_GET['attachment_ID'] ) ? absint($_GET['attachment_ID']) : absint( $_GET['id'] ) );
+		}
+
+		$original_meta = wp_get_attachment_metadata( $attachment_id );
+
+		$new_meta = $this->resize_from_meta_data( $original_meta, $attachment_id );
+		wp_update_attachment_metadata( $attachment_id, $new_meta );
+
+		$sendback = wp_get_referer();
+		$sendback = preg_replace('|[^a-z0-9-~+_.?#=&;,/:]|i', '', $sendback);
+		wp_redirect($sendback);
+		exit(0);
 	}
-	
-	$return = array( $file, __('Bad response from optimizer', CW_IMAGE_OPTIMIZER_DOMAIN) );
-	
-	if($result == 'unchanged') {
-		$return = array($file, __('No savings', CW_IMAGE_OPTIMIZER_DOMAIN));
-	}
 
-	if(strpos($result, ' vs. ') !== false) {
-		$s = explode(' vs. ', $result);
-		
-		$savings = intval($s[0]) - intval($s[1]);
-		$savings_str = cw_image_optimizer_format_bytes($savings, 1);
-		$savings_str = str_replace(' ', '&nbsp;', $savings_str);
 
-		$percent = 100 - (100 * ($s[1] / $s[0]));
-
-		$results_msg = sprintf(__("Reduced by %01.1f%% (%s)", CW_IMAGE_OPTIMIZER_DOMAIN),
-					 $percent,
-					 $savings_str);
-
-		$return = array($file, $results_msg);
-	}
 
 	/**
-	 * NOTE: Should normally only available to convert / IM
+	 * Process an image.
+	 *
+	 * Returns an array of the $file $results.
+	 *
+	 * @param   string $file            Full absolute path to the image file
+	 * @returns array
 	 */
+	function optimize_image($file, $quality = '') {
+		// don't run on localhost, IPv4 and IPv6 checks
+		// if( in_array($_SERVER['SERVER_ADDR'], array('127.0.0.1', '::1')) )
+		//	return array($file, __('Not processed (local file)', CW_IMAGE_OPTIMIZER_DOMAIN));
 
-	if( !empty( $quality ) ) {
+		// canonicalize path - disabled 2011-02-1 troubleshooting 'Could not find...' errors.
+		// From the PHP docs: "The running script must have executable permissions on 
+		// all directories in the hierarchy, otherwise realpath() will return FALSE."
+		// $file_path = realpath($file);
+		$tools = _ui_io_base::get_settings( 'tools' );
 		
-		
-		if( !empty( $file_copy ) && $file_copy !== $file ) {
-		
-			$old_size = filesize( $file_copy );
+		$file_path = $file;
+
+		// check that the file exists
+		if ( FALSE === file_exists($file_path) || FALSE === is_file($file_path) ) {
+			$msg = sprintf(__("Could not find <span class='code'>%s</span>", CW_IMAGE_OPTIMIZER_DOMAIN), $file_path);
+			return array($file, $msg);
+		}
+
+		// check that the file is writable
+		if ( FALSE === is_writable($file_path) ) {
+			$msg = sprintf(__("<span class='code'>%s</span> is not writable", CW_IMAGE_OPTIMIZER_DOMAIN), $file_path);
+			return array($file, $msg);
+		}
+
+		// check that the file is within the WP_CONTENT_DIR
+		$upload_dir = wp_upload_dir();
+		$wp_upload_dir = $upload_dir['basedir'];
+		$wp_upload_url = $upload_dir['baseurl'];
+		if ( 0 !== stripos(realpath($file_path), realpath($wp_upload_dir)) ) {
+			$msg = sprintf(__("<span class='code'>%s</span> must be within the content directory (<span class='code'>%s</span>)", CW_IMAGE_OPTIMIZER_DOMAIN), htmlentities($file_path), $wp_upload_dir);
+
+			return array($file, $msg);
+		}
+
+		if(function_exists('getimagesize')){
+			$type = getimagesize($file_path);
+			if(false !== $type){
+				$type = $type['mime'];
+			}
+		}elseif(function_exists('mime_content_type')){
+			$type = mime_content_type($file_path);
+		}else{
+			$type = 'Missing getimagesize() and mime_content_type() PHP functions';
 		}
 		
-		$new_size = filesize( $file );
+		$file_copy = '';
+		$params = '';
+		$old_size = 0;
 		
-		/*new __debug( array(
-			'quality' => $quality,
-			'old_size' => $old_size,
-			'new_size' => $new_size,
-			'file_copy' => $file_copy,
-			'file' => $file,
-		) );
-		*/
-		if( !empty( $old_size ) ) {
-			$savings = intval( $old_size ) - intval( $new_size );
+		switch($type){
+			case 'image/jpeg':
+				$command = 'opt-jpg';
+				$command = $tools[ 'jpg' ];
+				
+				//if( CW_IMAGE_OPTIMIZER_JPG == false && defined( 'CW_IMAGE_OPTIMIZER_FALLBACK' ) && CW_IMAGE_OPTIMIZER_FALLBACK !== false ) {
+				if( empty( $tools[ 'jpg' ] ) && !empty( $tools['fallback'] ) ) {	
+					
+					$command = $tools['fallback'];
+					$params = ' %s -quality %d %s';
+					
+					//$file_copy = pathinfo( $file , PATHINFO_FILENAME ) . '.bak.' . pathinfo( $file , PATHINFO_EXTENSION );
+					
+					$file_path = pathinfo( $file );
+					
+					$file_copy = trailingslashit( $file_path['dirname'] ) . $file_path['filename'] . '.bak.' . $file_path['extension'];
+					
+					if( empty( $quality ) ) {
+						$quality = '75%';
+					}
+				}
+
+				break;
+			case 'image/png':
+				$command = 'opt-png';
+				$command = $tools[ 'png' ];
+				
+				if( empty( $tools[ 'png' ] ) && !empty( $tools['fallback'] ) ) {
+					$command = $tools['fallback'];
+					$params = ' %s -quality %s %s ';
+					$file_path = pathinfo( $file );
+					
+					$file_copy = trailingslashit( $file_path['dirname'] ) . $file_path['filename'] . '.bak.' . $file_path['extension'];
+					
+					if( empty( $quality ) ) {
+						$quality = '4';
+					}
+				}
+
+				break;
+			case 'image/gif':
+				$command = 'opt-gif';
+				break;
+			default:
+				return array($file, __('Unknown type: ' . $type, CW_IMAGE_OPTIMIZER_DOMAIN));
+				break;
+		}
+
+		if( !empty( $params ) ) {
 			
-			$savings_str = cw_image_optimizer_format_bytes($savings, 1);
+			if( empty( $old_size ) ) {
+				$old_size = filesize( $file );
+			}
+			
+			if( empty( $file_copy ) ) {
+				$file_copy = $file;
+			}
+			
+			$strCommand = $command . ' ' . sprintf( $params, $file_copy, $quality, $file );
+			
+			//new __debug( array('file_copy' => $file_copy, 'file' => $file, 'old_size' => $old_size, 'cli' => $strCommand ), 'running convert' );
+			
+			//$result = exec( $command . ' ' . sprintf( $params, $file, $quality, $file_copy  ) );
+			if( $file_copy != $file ) { // switch files before processing them
+				copy( $file, $file_copy );
+			}
+			
+			$result = exec( $strCommand );
+			
+			
+		
+		} else {
+			$result = exec($command . ' ' . escapeshellarg($file));
+
+			$result = str_replace($file . ': ', '', $result);
+
+		}
+		
+		$return = array( $file, __('Bad response from optimizer', CW_IMAGE_OPTIMIZER_DOMAIN) );
+		
+		if($result == 'unchanged') {
+			$return = array($file, __('No savings', CW_IMAGE_OPTIMIZER_DOMAIN));
+		}
+
+		if(strpos($result, ' vs. ') !== false) {
+			$s = explode(' vs. ', $result);
+			
+			$savings = intval($s[0]) - intval($s[1]);
+			$savings_str = $this->_format_bytes($savings, 1);
 			$savings_str = str_replace(' ', '&nbsp;', $savings_str);
 
-			$percent = 100 - (100 * ( $new_size / $old_size));
+			$percent = 100 - (100 * ($s[1] / $s[0]));
 
 			$results_msg = sprintf(__("Reduced by %01.1f%% (%s)", CW_IMAGE_OPTIMIZER_DOMAIN),
 						 $percent,
@@ -948,74 +968,132 @@ function cw_image_optimizer($file, $quality = '') {
 
 			$return = array($file, $results_msg);
 		}
+
+		/**
+		 * NOTE: Should normally only available to convert / IM
+		 */
+
+		if( !empty( $quality ) ) {
+			
+			
+			if( !empty( $file_copy ) && $file_copy !== $file ) {
+			
+				$old_size = filesize( $file_copy );
+			}
+			
+			$new_size = filesize( $file );
+			
+			/*new __debug( array(
+				'quality' => $quality,
+				'old_size' => $old_size,
+				'new_size' => $new_size,
+				'file_copy' => $file_copy,
+				'file' => $file,
+			) );
+			*/
+			if( !empty( $old_size ) ) {
+				$savings = intval( $old_size ) - intval( $new_size );
+				
+				$savings_str = $this->_format_bytes($savings, 1);
+				$savings_str = str_replace(' ', '&nbsp;', $savings_str);
+
+				$percent = 100 - (100 * ( $new_size / $old_size));
+
+				$results_msg = sprintf(__("Reduced by %01.1f%% (%s)", CW_IMAGE_OPTIMIZER_DOMAIN),
+							 $percent,
+							 $savings_str);
+
+				$return = array($file, $results_msg);
+			}
+		}
+
+		return $return;
+		//return array($file, __('Bad response from optimizer', CW_IMAGE_OPTIMIZER_DOMAIN));
 	}
 
-	return $return;
-    //return array($file, __('Bad response from optimizer', CW_IMAGE_OPTIMIZER_DOMAIN));
-}
+
+	/**
+	 * Read the image paths from an attachment's meta data and process each image
+	 * with cw_image_optimizer().
+	 *
+	 * This method also adds a `cw_image_optimizer` meta key for use in the media library.
+	 *
+	 * Called after `wp_generate_attachment_metadata` is completed.
+	 */
+	public static function resize_from_meta_data($meta, $ID = null) {
+		if( defined( '_DISABLE_UI_IO' ) || defined( '_DISABLE_CW_IO_ADAPTED') || defined( 'DISABLE_CW_IO_ADAPTED') ) {
+			return $meta;
+		}
+		$file_path = $meta['file'];
+		$store_absolute_path = true;
+		$upload_dir = wp_upload_dir();
+		$upload_path = trailingslashit( $upload_dir['basedir'] );
+
+		// WordPress >= 2.6.2: determine the absolute $file_path (http://core.trac.wordpress.org/changeset/8796)
+		if ( FALSE === strpos($file_path, WP_CONTENT_DIR) ) {
+			$store_absolute_path = false;
+			$file_path =  $upload_path . $file_path;
+		}
+
+		list($file, $msg) = $this->optimize_image($file_path);
+
+		$meta['file'] = $file;
+		$meta['cw_image_optimizer'] = $msg;
+
+		// strip absolute path for Wordpress >= 2.6.2
+		if ( FALSE === $store_absolute_path ) {
+			$meta['file'] = str_replace($upload_path, '', $meta['file']);
+		}
+
+		// no resized versions, so we can exit
+		if ( !isset($meta['sizes']) )
+			return $meta;
+
+		// meta sizes don't contain a path, so we calculate one
+		$base_dir = dirname($file_path) . '/';
 
 
-/**
- * Read the image paths from an attachment's meta data and process each image
- * with cw_image_optimizer().
- *
- * This method also adds a `cw_image_optimizer` meta key for use in the media library.
- *
- * Called after `wp_generate_attachment_metadata` is completed.
- */
-function cw_image_optimizer_resize_from_meta_data($meta, $ID = null) {
-	$file_path = $meta['file'];
-	$store_absolute_path = true;
-	$upload_dir = wp_upload_dir();
-	$upload_path = trailingslashit( $upload_dir['basedir'] );
+		foreach($meta['sizes'] as $size => $data) {
+			list($optimized_file, $results) = $this->optimize_image($base_dir . $data['file']);
 
-	// WordPress >= 2.6.2: determine the absolute $file_path (http://core.trac.wordpress.org/changeset/8796)
-	if ( FALSE === strpos($file_path, WP_CONTENT_DIR) ) {
-		$store_absolute_path = false;
-		$file_path =  $upload_path . $file_path;
-	}
+			$meta['sizes'][$size]['file'] = str_replace($base_dir, '', $optimized_file);
+			$meta['sizes'][$size]['cw_image_optimizer'] = $results;
+		}
 
-	list($file, $msg) = cw_image_optimizer($file_path);
-
-	$meta['file'] = $file;
-	$meta['cw_image_optimizer'] = $msg;
-
-	// strip absolute path for Wordpress >= 2.6.2
-	if ( FALSE === $store_absolute_path ) {
-		$meta['file'] = str_replace($upload_path, '', $meta['file']);
-	}
-
-	// no resized versions, so we can exit
-	if ( !isset($meta['sizes']) )
 		return $meta;
-
-	// meta sizes don't contain a path, so we calculate one
-	$base_dir = dirname($file_path) . '/';
-
-
-	foreach($meta['sizes'] as $size => $data) {
-		list($optimized_file, $results) = cw_image_optimizer($base_dir . $data['file']);
-
-		$meta['sizes'][$size]['file'] = str_replace($base_dir, '', $optimized_file);
-		$meta['sizes'][$size]['cw_image_optimizer'] = $results;
 	}
 
-	return $meta;
+
+
+	/**
+	 * Return the filesize in a humanly readable format.
+	 * Taken from http://www.php.net/manual/en/function.filesize.php#91477
+	 */
+	function _format_bytes($bytes, $precision = 2) {
+		$units = array('B', 'KB', 'MB', 'GB', 'TB');
+		$bytes = max($bytes, 0);
+		$pow = floor(($bytes ? log($bytes) : 0) / log(1024));
+		$pow = min($pow, count($units) - 1);
+		$bytes /= pow(1024, $pow);
+		return round($bytes, $precision) . ' ' . $units[$pow];
+	}
 }
 
 
-
-/**
- * Return the filesize in a humanly readable format.
- * Taken from http://www.php.net/manual/en/function.filesize.php#91477
- */
-function cw_image_optimizer_format_bytes($bytes, $precision = 2) {
-    $units = array('B', 'KB', 'MB', 'GB', 'TB');
-    $bytes = max($bytes, 0);
-    $pow = floor(($bytes ? log($bytes) : 0) / log(1024));
-    $pow = min($pow, count($units) - 1);
-    $bytes /= pow(1024, $pow);
-    return round($bytes, $precision) . ' ' . $units[$pow];
-}
-
-
+	/**
+	 * Wrapper for @method optimize_image
+	 */
+if( !function_exists( 'cw_image_optimizer' ) ) :
+	function cw_image_optimizer( $file, $quality = '' ) {
+		$return = false;
+		
+		if( empty( $GLOBALS['_ui_image_optimizer'] ) ) {
+			$GLOBALS[ '_ui_image_optimizer' ] = new _ui_io_resizer( false );
+		}
+		
+		if( !empty( $GLOBALS['_ui_image_optimizer'] ) ) {
+			$return = $GLOBALS['_ui_image_optimizer']->optimize_image( $file, $quality );
+		}
+		return $return;
+	}
+endif;
