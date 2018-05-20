@@ -1,23 +1,23 @@
-=== CW Image Optimizer Advanced ===
+=== UI Image Optimizer ===
 Contributors: usability.idealist
 Donate link: https://www.paypal.me/FabianWolf
 Tags: images, image, attachments, attachment, optimization, conversion
 Requires at least: 2.9
-Tested up to: 4.8
-Stable tag: 1.2
+Tested up to: 5.0
+Stable tag: 1.3.1
 
 Reduce image file sizes and improve performance using Linux image optimization programs.
 
 == Description ==
 
-CW Image Optimizer Advanced is a WordPress plugin that will automatically, both losslessly or lossy optimize your images as you upload them to your blog. It can also optimize the images that you have already uploaded in the past.
+UI Image Optimizer is a WordPress plugin that will automatically, both losslessly or lossy optimize your images as you upload them to your blog. It can also optimize the images that you have already uploaded in the past.
 
-CW Image Optimizer Advanced uses both lossless optimization and lossy techniques, the latter one as a fallback (ImageMagick) if none of the littleutils binaries is available.
+UI Image Optimizer uses both lossless optimization and lossy techniques, the latter one as a fallback (ImageMagick) if none of the littleutils binaries is available.
 With the lossless image optimizers, your image quality will be exactly the same before and after the optimization. The only thing that will change is your file size.
 
-The CW Image Optimizer Advanced plugin is based on the WP Smush.it plugin. Unlike the WP Smush.it plugin, your files won’t be uploaded to a third party when using CW Image Optimizer. Your files are optimized using the Linux [littleutils](http://sourceforge.net/projects/littleutils/) image optimization tools (available for free). You don’t need to worry about the Smush.it privacy policy or terms of service because your images never leave your server.
+The UI Image Optimizer plugin is based on the WP Smush.it plugin. Unlike the WP Smush.it plugin, your files won’t be uploaded to a third party when using UI Image Optimizer. Your files are optimized using the Linux [littleutils](http://sourceforge.net/projects/littleutils/) image optimization tools (available for free). You don’t need to worry about the Smush.it privacy policy or terms of service because your images never leave your server.
 
-**Why use CW Image Optimizer Advanced?**
+**Why use UI Image Optimizer?**
 
 1. **Your pages will load faster.** Smaller image sizes means faster page loads. This will make your visitors happy, and can increase ad revenue.
 1. **Faster backups.** Smaller image sizes also means faster backups.
@@ -84,7 +84,7 @@ The third option is to manually add or change the paths of each tool in the resp
 
 == Frequently Asked Questions ==
 
-= Can I use CW Image Optimizer Advanced with a Windows server? =
+= Can I use UI Image Optimizer with a Windows server? =
 
 Yes and no. The littleutils are only available for Linux and other Unix derivates.
 ImageMagick is [available for Windows](http://www.imagemagick.org/script/binary-releases.php#windows), too.
@@ -93,7 +93,7 @@ ImageMagick is [available for Windows](http://www.imagemagick.org/script/binary-
 
 Preferably yes.
 
-CW Image Optimizer Advanced expects *opt-jpg*, *opt-png*, and *opt-gif* to be in the PATH. If that fails, it will try to use *convert* (ImageMagick) as a fallback.
+UI Image Optimizer expects *opt-jpg*, *opt-png*, and *opt-gif* to be in the PATH. If that fails, it will try to use *convert* (ImageMagick) as a fallback.
 
 == Screenshots ==
 
@@ -102,6 +102,14 @@ CW Image Optimizer Advanced expects *opt-jpg*, *opt-png*, and *opt-gif* to be in
 3. Configuration dialogue page. Enables you to customize the optimizer paths if auto-detection fails, and fine-tune the quality (of compression) levels for PNG and JPEG, too.
 
 == Changelog ==
+
+= 1.3.1 =
+* Fixed quality settings not being saved
+
+= 1.3 =
+* Added support for Gifsicle as a gif optimization fallback
+* Improved and optimized overall program structure
+* A few bug fixes
 
 = 1.2 =
 * Forked from CW Image Optimizer (2016-12-19)

@@ -1,7 +1,7 @@
 <?php
 /**
  * Integrate Linux image optimizers into WordPress.
- * @version 1.2
+ * @version 1.3.1
  * @package CW_Image_Optimizer
  */
 /*
@@ -9,7 +9,7 @@ Plugin Name: UI Image Optimizer
 Plugin URI: http://f2w.de/cw-io-advanced
 Description: Reduce image file sizes and improve performance using Linux image optimizers within WordPress. Fork of CW Image Optimizer, which is using ImageMagick as fallback option.
 Author: Fabian Wolf
-Version: 1.3
+Version: 1.3.1
 Author URI: http://usability-idealist.de
 */
 
@@ -18,7 +18,7 @@ Author URI: http://usability-idealist.de
  */
 define('CW_IMAGE_OPTIMIZER_DOMAIN', 'cw_image_optimizer');
 define('CW_IMAGE_OPTIMIZER_PLUGIN_DIR', dirname(plugin_basename(__FILE__)));
-define('_UI_IO_NAME', 'CW Image Optimizer Advanced');
+define('_UI_IO_NAME', 'UI Image Optimizer');
 
 
 
@@ -44,8 +44,8 @@ register_activation_hook( __FILE__, array( '_ui_io_base', 'plugin_install' ) );
 
 
 class _ui_io_base {
-	const pluginName = 'CW Image Optimizer Advanced';
-	const pluginVersion = '1.2';
+	const pluginName = _UI_IO_NAME;
+	const pluginVersion = '1.3';
 	const optionName = 'cw_io_settings';
 	const pluginPrefix = '_ui_io_';
 	const pluginPrefixCompat = 'cw_image_optimizer_';
@@ -82,10 +82,11 @@ class _ui_io_base {
 				'png' => false,
 				'jpg' => false,
 				'gif' => false,
+				'gifsicle' => false,
 				'fallback' => false,
 			),
-			'quality_jpg' => 75,
-			'quality_png' => 50,
+			'quality_jpg' => '75',
+			'quality_png' => '50',
 		);
 		
 		return $defaults;
@@ -112,7 +113,7 @@ class _ui_io_base {
 		$return = false;
 		
 		if( !empty( $settings ) ) {
-			//new __debug( $settings, __METHOD__ );
+			new __debug( $settings, __METHOD__ );
 			
 			$return = update_option( self::optionName, $settings );
 		}
@@ -124,6 +125,10 @@ class _ui_io_base {
 		$return = false;
 		
 		$options = get_option( self::optionName, self::get_default_settings() );
+		
+		//new __debug( get_option( self::optionName ), 'options - ' . __METHOD__ );
+		//new __debug( self::get_default_settings(), 'default options - ' . __METHOD__ );
+		
 		$update_options = $options;
 		
 		if( !empty( $option_name ) && isset( $options[ $option_name ] ) && $options[ $option_name ] != $value ) {
@@ -198,7 +203,7 @@ class _ui_io_base {
 				
 				/*first, we need to check if the system is windows*/
 				if( WINDOWS_SERVER ) {
-					if(strpos($path, ":") == 1 && preg_match('/[a-zA-Z]/', $path[0])) { // check if it's something like C:\
+					if(strpos($path, ':') == 1 && preg_match('/[a-zA-Z]/', $path[0])) { // check if it's something like C:\
 						$tmp = substr($path,2);
 						$bool = preg_match('/^[^*?"<>|:]*$/',$tmp);
 						$return = ($bool == 1); // so that it will return only true and false
@@ -214,7 +219,7 @@ class _ui_io_base {
 
 
 add_action('init', array( '_ui_io_admin', 'init' ) );
-add_action('admin_action_cw_io_manual', array( '_ui_io_resizer', 'manual_call' ) );
+//add_action('admin_action_cw_io_manual', array( '_ui_io_resizer', 'manual_call' ) );
 
 class _ui_io_admin extends _ui_io_base {
 	public $notice_transient = '_ui_io_notice_dismissed';
@@ -263,22 +268,26 @@ class _ui_io_admin extends _ui_io_base {
 		//wp_enqueue_script('common');
 		//register_setting('cw_image_optimizer_options', 'cw_image_optimizer_skip_check');
 		
-		register_setting( 'cw_io_settings', 'cw_io_settings', array( $this, 'admin_validate_settings' ) );
+		register_setting( 'cw_io_settings', 'cw_io_settings', array( 'sanitize_callback' => array( $this, 'admin_validate_settings' ) ) );
 		
 		$strSectionID = 'cw_io_main';
 		$strSectionPageSlug = 'cw_io_main_settings';
 		
-		add_settings_section( $strSectionID, self::pluginName . ' Settings', array( $this, 'admin_section_main' ), $strSectionPageSlug );
+		add_settings_section( $strSectionID, self::pluginName . ' ' . __('Settings', CW_IMAGE_OPTIMIZER_DOMAIN ), array( $this, 'admin_section_main' ), $strSectionPageSlug );
 		add_settings_field( 'field-skip_check', 'Skip littleutils check', array( $this, 'admin_field_skip_check' ), $strSectionPageSlug, $strSectionID );
 		add_settings_field( 'field-tools_jpg', 'JPEG optimizer path', array( $this, 'admin_field_tools_jpg' ), $strSectionPageSlug, $strSectionID );
 		add_settings_field( 'field-tools_png', 'PNG optimizer path', array( $this, 'admin_field_tools_png' ), $strSectionPageSlug, $strSectionID );
 		add_settings_field( 'field-tools_gif', 'GIF optimizer path', array( $this, 'admin_field_tools_gif' ), $strSectionPageSlug, $strSectionID );
+		add_settings_field( 'field-tools_gifsicle', 'Gifsicle path', array( $this, 'admin_field_tools_gifsicle' ), $strSectionPageSlug, $strSectionID );
 		add_settings_field( 'field-tools_fallback', 'ImageMagick path', array( $this, 'admin_field_tools_fallback' ), $strSectionPageSlug, $strSectionID );
 		
 		
 		//$strSectionID = 'cw_io_quality';
 		//$strSectionPageSlug = 'cw_io_quality_settings';
 		
+		//register_setting( 'cw_io_quality_settings', 'cw_io_settings[quality]', array( 'type' => 'number','sanitize_callback' => array( $this, 'admin_validate_settings' ) ) );
+		
+		//add_settings_section( $strSectionID, __('Quality Settings', CW_IMAGE_OPTIMIZER_DOMAIN ), array( $this, 'admin_section_quality' ), $strSectionPageSlug );
 		add_settings_field( 'field-quality_jpg', 'JPEG quality', array( $this, 'admin_field_quality_jpg' ), $strSectionPageSlug, $strSectionID );
 		add_settings_field( 'field-quality_png', 'PNG level of compression', array( $this, 'admin_field_quality_png' ), $strSectionPageSlug, $strSectionID );
 		
@@ -286,12 +295,16 @@ class _ui_io_admin extends _ui_io_base {
 		//add_settings_section( $strSectionID, self::pluginName . ' Settings', array( $this, 'admin_section_main' ), $strSectionPageSlug );
 	}
 	
-	function admin_section_main( $arg ) {
+	function admin_section_main( $args ) {
 		//new __debug( $arg, __METHOD__ );
 		?>
-		<p><?php echo self::pluginName; ?> performs several checks to make sure your system is capable of optimizing images.</p>
-		<p>In some cases, these checks may erroneously report that you are missing littleutils even though you have littleutils installed.</p>
+		<p><?php printf( __( '%s performs several checks to make sure your system is capable of optimizing images.', CW_IMAGE_OPTIMIZER_DOMAIN ), self::pluginName ); ?></p>
+		<p><?php _e('In some cases, these checks may erroneously report that you are missing <code>littleutils</code> even though you have <code>littleutils</code> installed.', CW_IMAGE_OPTIMIZER_DOMAIN ); ?></p>
 		<?php
+	}
+	
+	function admin_section_quality( $args ) {
+		?><p><?php _e('Customize the quality settings per image type.', CW_IMAGE_OPTIMIZER_DOMAIN); ?></p><?php
 	}
 	
 	function admin_field_skip_check() {
@@ -315,6 +328,11 @@ class _ui_io_admin extends _ui_io_base {
 		?><input type="text" id="field-tools_gif" name="<?php echo $this->strOptionName . '[tools][gif]'; ?>" class="regular-text" value="<?php echo $tools['gif']; ?>" /><?php
 	}
 	
+	function admin_field_tools_gifsicle() {
+		$tools = self::get_settings( 'tools' );
+		?><input type="text" id="field-tools_gifsicle" name="<?php echo $this->strOptionName . '[tools][gifsicle]'; ?>" class="regular-text" value="<?php echo $tools['gifsicle']; ?>" /><?php
+	}
+	
 	function admin_field_tools_fallback() {
 		$tools = self::get_settings( 'tools' );
 		if( isset( $tools['convert'] ) && !isset( $tools['fallback'] ) ) {
@@ -330,14 +348,14 @@ class _ui_io_admin extends _ui_io_base {
 		$quality = self::get_settings( 'quality_jpg', $default );
 		
 		?>
-		<input type="number" class="small-text" id="field-quality_jpg" name="<?php echo $this->strOptionName . '[quality_jpg]'; ?>" value="<?php echo $quality; ?>" min="10" step="1" max="100" /> <span class="description">Quality in percent (10 - 100%; defaults to <?php echo $default; ?>%)</span><?php
+		<input type="text" class="small-text" id="field-quality_jpg" name="<?php echo $this->strOptionName . '[quality_jpg]'; ?>" value="<?php echo $quality; ?>" /> <span class="description">Quality in percent (10 - 100%; defaults to <?php echo $default; ?>%)</span><?php
 	}
 	
 	function admin_field_quality_png() {
 		$default = 50;
 		$quality = self::get_settings( 'quality_png', $default );
 		
-		?><input type="number" class="small-text" id="field-quality_png" name="<?php echo $this->strOptionName . '[quality_png]'; ?>" class="regular-text" value="<?php echo $quality; ?>" min="1" max="100" step="1"/> <span class="description"><a href="http://www.howtogeek.com/203979/is-the-png-format-lossless-since-it-has-a-compression-parameter/">Quality of compression</a> in percent (1 - 100%; defaults to <?php echo $default; ?>%)</span><?php
+		?><input type="text" class="small-text" id="field-quality_png" name="<?php echo $this->strOptionName . '[quality_png]'; ?>" value="<?php echo $quality; ?>" /> <span class="description"><a href="http://www.howtogeek.com/203979/is-the-png-format-lossless-since-it-has-a-compression-parameter/">Quality of compression</a> in percent (1 - 100%; defaults to <?php echo $default; ?>%)</span><?php
 	}
 
 	function admin_validate_settings( $input ) {
@@ -354,56 +372,99 @@ class _ui_io_admin extends _ui_io_base {
 			}
 			
 			foreach( $default_settings as $strName => $value ) {
-				if( $strName == 'skip_check' ) {
-					$return[ 'skip_check' ] = ( !empty( $input[ 'skip_check' ] ) ? 1 : 0 );
-				} elseif( $strName == 'tools' ) {
+				
+				switch( $strName ) {
+				
+				
+				//if( $strName == 'skip_check' ) {
+					case 'skip_check':
 					
-					foreach( $value as $strToolName => $toolValue ) {
-						//$inputValue = trim( $input[ 'tools' ][ $strToolName ] );
-						
-						//if( isset( $input[ $strName ][ $strToolName ] ) && $input[ $strName ][ $strToolName ] != $toolValue ) {
-							if( !empty( $input[ 'tools' ][ $strToolName ] ) ) {
-								if( self::is_valid_filepath( $input[ 'tools' ][ $strToolName ] ) != false ) {
-									$return[ 'tools' ][ $strToolName ] = $input[ 'tools' ][ $strToolName ];
-								}
-							} else {
-								$return['tools'][ $strToolName ] = '';
-							}
-						//} elseif( empty( trim( $input[ $strName ][ $strToolName ] ) ) ) {
+						$return[ 'skip_check' ] = ( !empty( $input[ 'skip_check' ] ) ? 1 : 0 );
+						break;
+				//} elseif( $strName == 'tools' ) {
+					case 'tools':
+						foreach( $value as $strToolName => $toolValue ) {
+							//$inputValue = trim( $input[ 'tools' ][ $strToolName ] );
 							
-						//}
-						//}
-					}
+							//if( isset( $input[ $strName ][ $strToolName ] ) && $input[ $strName ][ $strToolName ] != $toolValue ) {
+								if( !empty( $input[ 'tools' ][ $strToolName ] ) ) {
+									if( self::is_valid_filepath( $input[ 'tools' ][ $strToolName ] ) != false ) {
+										$return[ 'tools' ][ $strToolName ] = $input[ 'tools' ][ $strToolName ];
+									}
+								} else {
+									$return['tools'][ $strToolName ] = '';
+								}
+							//} elseif( empty( trim( $input[ $strName ][ $strToolName ] ) ) ) {
+								
+							//}
+							//}
+						}
+						break;
+						
 				/**
 				 * NOTE: Quality behaviour of JPEG and PNG is vice-versa, but they are using the same scale (1 - 100). Also see @link http://www.howtogeek.com/203979/is-the-png-format-lossless-since-it-has-a-compression-parameter/
 				 */
 					
-				} elseif( $strName == 'quality_jpg' ) {
+				//} elseif( $strName == 'quality_jpg' ) {
+					case 'quality':
+						if( isset( $value[ 'jpg' ] ) ) {
+							$return[ $strName ][ 'jpg' ] = $input[ 'jpg' ];
+						}
 					
-					if( !empty( $value ) ) {
-						$sanitized_value = intval( $value );
+					
+						if( isset( $value[ 'png' ] ) ) {
+							$return[ $strName ][ 'png' ] = $input[ 'png' ];
+						}
+					
+						break;
+					
+					/**
+					 * NOTE: $value is from $default_params! $input is the actual value to check!
+					 */
+					case 'quality_jpg': 
+						$min_value = 9;
+						if( empty( $input[ $strName ] ) ) {
+							$input = $min_value;
+						}
 						
-							
-						if( !empty( $sanitized_value ) && $sanitized_value > 9 && $sanitized_value <= 100 ) {
-							$return[ $strName ] = $sanitized_value;
+						//if( !empty( $input ) ) { 
+
+						$sanitized_input = ( function_exists( 'absint' ) ? absint( trim( $input[ $strName ] ) ) : abs( intval( trim( $input[ $strName ] ) ) ) );
+						
+						if( !empty( $sanitized_input ) && $sanitized_input > 9 && $sanitized_input <= 100 ) {
+							$return[ $strName ] = $sanitized_input;
 						}
-					}
-				} elseif( $strName == 'quality_png' ) {
+						//}
+						
+						break;
+				//} elseif( $strName == 'quality_png' ) {
+					case 'quality_png':
+						$min_value = 9;
+						if( empty( $input[ $strName ] ) ) {
+							$input = $min_value;
+						}
+						
+						$sanitized_input = ( function_exists( 'absint' ) ? absint( trim( $input[ $strName ] ) ) : abs( intval( trim( $input[ $strName ] ) ) ) );
+						
+						if( !empty( $sanitized_input ) && $sanitized_input >= 1 && $sanitized_input <= 100 ) {
+							$return[ $strName ] = $sanitized_input;
+						}
+						
+						break;
+
+				//} else {
+					default:
 					
-					if( !empty( $value ) ) {
-						$sanitized_value = intval( $value );
+						if( isset( $input[ $strName ] ) && $input[ $strName ] != $value ) {
+							$return[ $strName ] = $value;
 							
-						if( !empty( $sanitized_value ) && $sanitized_value >= 1 && $sanitized_value <= 100 ) {
-							$return[ $strName ] = $sanitized_value;
+							if( self::is_valid_filepath( $input[ $strName ] ) || empty( $input[ $strName ] ) ) {
+								$return[ $strName ] = trim( $input[ $strName ]);
+							}
 						}
-					}
-
-
-				} else {
-					if( isset( $input[ $strName] ) && $input[ $strName ] != $value ) {
-						$return[ $strName ] = $value;
-					}
-				}
+						
+						break;
+				//}
 				
 				//if( isset( $input[ $strName ] ) && $input[ $strName ] != $value ) {
 					/*switch( $strName ) {
@@ -417,6 +478,8 @@ class _ui_io_admin extends _ui_io_base {
 							break;
 					}*/
 				//}
+				
+				}
 			}
 		}
 			
@@ -478,7 +541,7 @@ class _ui_io_admin extends _ui_io_base {
 				<?php settings_fields('cw_io_settings'); ?>
 				<?php do_settings_sections('cw_io_main_settings'); ?>
 				
-				<p>Local path: <input type="text" class="regular-text" value="<?php echo ABSPATH; ?>" /></p>
+				<p><label>Local path: <input type="text" class="long-text" value="<?php echo ABSPATH; ?>" /></label></p>
 				
 				<p class="submit"><?php submit_button( __('Save Changes'), 'primary', 'submit', false ); ?>
 					<?php submit_button('Detect paths', 'primary', 'detect_tools', false );?>
@@ -533,9 +596,7 @@ class _ui_io_admin extends _ui_io_base {
 				<p><strong><?php 
 				printf( __('%1$s requires <a href="%2$s">littleutils</a> or <a href="%3$s">ImageMagick</a>.', CW_IMAGE_OPTIMIZER_DOMAIN ), self::pluginName, 'http://sourceforge.net/projects/littleutils/', 'http://imagemagick.org' ); ?></strong>
 				
-				<?php 
-				printf( __('You are missing: %s', CW_IMAGE_OPTIMIZER_DOMAIN ),  $msg  );
-				?>
+				<?php printf( __('You are missing: %s', CW_IMAGE_OPTIMIZER_DOMAIN ), $msg  ); ?> <a href="<?php echo admin_url( 'options-general.php?page=ui-image-optimizer/cw-image-optimizer.php'); ?>"><?php _e('Change Settings', CW_IMAGE_OPTIMIZER_DOMAIN ); ?></a>
 				</p><button class="notice-dismiss" type="button"><span class="screen-reader-text sr-only"><?php _e('Dismiss this notice.'); ?></span></button>
 				
 			</div>
@@ -611,7 +672,7 @@ class _ui_io_admin extends _ui_io_base {
 				
 				$size = filesize( $file_path );
 				
-				echo ( cw_image_optimizer_format_bytes( $size ) );
+				echo _ui_io_resizer::format_bytes( $size );
 				
 			} else {
 				echo '-';
@@ -623,10 +684,12 @@ class _ui_io_admin extends _ui_io_base {
 		if( $column_name == 'cw-io-advanced' ) {
 			$data = wp_get_attachment_metadata($id);
 
-			if(!isset($data['file'])){
-				$msg = 'Metadata is missing file path.';
+			if( !isset($data['file']) ) {
+				$msg = __('Metadata is missing file path.', CW_IMAGE_OPTIMIZER_DOMAIN );
 				//print __('Unsupported file type', CW_IMAGE_OPTIMIZER_DOMAIN) . $msg;
-				print __('Unsupported file type', CW_IMAGE_OPTIMIZER_DOMAIN) . $msg;
+				echo __('Unsupported file type', CW_IMAGE_OPTIMIZER_DOMAIN ) . ' ';
+				
+				 //. $msg;
 				
 				return;
 			}
@@ -649,11 +712,11 @@ class _ui_io_admin extends _ui_io_base {
 				if(false !== $type){
 					$type = $type['mime'];
 				}
-			}elseif(function_exists('mime_content_type')){
-				$type = mime_content_type($file_path);
+			}elseif( function_exists('mime_content_type') ){
+				$type = mime_content_type( $file_path );
 			}else{
 				$type = false;
-				$msg = 'getimagesize() and mime_content_type() PHP functions are missing';
+				$msg = __( 'getimagesize() and mime_content_type() PHP functions are missing', CW_IMAGE_OPTIMIZER_DOMAIN );
 			}
 
 
@@ -665,21 +728,21 @@ class _ui_io_admin extends _ui_io_base {
 					
 					if( empty( $tools[ 'jpg' ] ) && empty( $tools['fallback'] ) ) {
 						$valid = false;
-						$msg = '<br>' . __('<em>opt-jpg</em> is missing');
+						$msg = '<br />' . sprintf( __('<em>%1$s</em> and <em>%2$s</em> are missing', CW_IMAGE_OPTIMIZER_DOMAIN ), 'opt-jpg', 'ImageMagick convert' );
 					}
 					break; 
 				case 'image/png':
 					//if(CW_IMAGE_OPTIMIZER_PNG == false && CW_IMAGE_OPTIMIZER_FALLBACK == false) {
 					if( empty( $tools[ 'png' ] ) && empty( $tools['fallback'] ) ) {
 						$valid = false;
-						$msg = '<br>' . __('<em>opt-png</em> is missing');
+						$msg = '<br />' .  sprintf( __('<em>%1$s</em> and <em>%2$s</em> are missing', CW_IMAGE_OPTIMIZER_DOMAIN ), 'opt-png', 'ImageMagick convert' );
 					}
 					break;
 				case 'image/gif':
 					if( empty( $tools[ 'gif' ] ) ) {
 					//if(CW_IMAGE_OPTIMIZER_GIF == false) {
 						$valid = false;
-						$msg = '<br>' . __('<em>opt-gif</em> is missing');
+						$msg = '<br />' . sprintf( __('<em>%s</em> is missing', CW_IMAGE_OPTIMIZER_DOMAIN ), 'opt-gif' );
 					}
 					break;
 				default:
@@ -692,21 +755,23 @@ class _ui_io_admin extends _ui_io_base {
 			}
 
 			if ( isset($data['cw_image_optimizer']) && !empty($data['cw_image_optimizer']) ) {
-				print $data['cw_image_optimizer'];
-				printf("<br><a href=\"admin.php?action=cw_io_manual&amp;id=%d\">%s</a>",
-						 $id,
-						 __('Re-optimize', CW_IMAGE_OPTIMIZER_DOMAIN));
+				echo $data['cw_image_optimizer'] . '<br />';
+				
+				echo ' <a href="' . admin_url('admin.php?action=cw_io_manual&id=' . $id ). '" class="">'. __( 'Re-optimize', CW_IMAGE_OPTIMIZER_DOMAIN ). '</a>' ;
 			} else {
-				print __('Not processed', CW_IMAGE_OPTIMIZER_DOMAIN);
-				printf('<br><a href="admin.php?action=cw_io_manual&amp;id=%d">%s</a>',
-						 $id,
-						 __('Optimize now!', CW_IMAGE_OPTIMIZER_DOMAIN));
+				echo __('Not processed', CW_IMAGE_OPTIMIZER_DOMAIN ) . '<br />';
+				
+				echo ' <a href="' . admin_url('admin.php?action=cw_io_manual&id=' . $id ). '" class=""><strong>'. __( 'Optimize file', CW_IMAGE_OPTIMIZER_DOMAIN ). '</strong></a>' ;
+				
+				//printf('<br><a href="admin.php?action=cw_io_manual&amp;id=%d">%s</a>', $id, __('Optimize now!', CW_IMAGE_OPTIMIZER_DOMAIN ) );
 			}
 		}
 	}
 
 	function _admin_page_options() {
 		$settings = self::get_settings();
+		
+	
 		
 	?>
 		<div class="wrap">
@@ -756,10 +821,7 @@ class _ui_io_admin extends _ui_io_base {
 }
 
 
-/**
- * Hooks
- */
-add_filter('wp_generate_attachment_metadata', array( '_ui_io_resizer', 'resize_from_meta_data' ), 10, 2);
+
 
 /**
  * Manually process an image from the Media Library
@@ -781,7 +843,14 @@ class _ui_io_resizer extends _ui_io_base {
 		
 			add_action( 'admin_action_cw_io_manual', array( $this, 'manual_call' ) );
 			add_action( 'admin_action_ui_io_manual', array( $this, 'manual_call' ) );
+			add_filter( 'wp_generate_attachment_metadata', array( $this, 'resize_from_meta_data' ), 10, 2);
 		}
+	
+		
+	}
+	
+	function ajax_call() {
+		
 	}
 	
 	function manual_call() {
@@ -805,7 +874,8 @@ class _ui_io_resizer extends _ui_io_base {
 
 		$sendback = wp_get_referer();
 		$sendback = preg_replace('|[^a-z0-9-~+_.?#=&;,/:]|i', '', $sendback);
-		wp_redirect($sendback);
+	
+		wp_redirect($sendback . '#post-' . $attachment_id );
 		exit(0);
 	}
 
@@ -911,6 +981,18 @@ class _ui_io_resizer extends _ui_io_base {
 				break;
 			case 'image/gif':
 				$command = 'opt-gif';
+				$command = $tools[ 'gif' ];
+				
+				if( empty( $tools[ 'gif' ] ) && !empty( $tools[ 'gifsicle' ] ) ) {
+					$command = $tools[ 'gifsicle' ];
+					$params = ' --optimize=%2$s %1$s -o %3$s'; /** @see https://davidwalsh.name/optimize-gifs */
+					
+					//if( empty( $quality ) ) {
+						$quality = '3';
+					//}
+					
+				}
+				
 				break;
 			default:
 				return array($file, __('Unknown type: ' . $type, CW_IMAGE_OPTIMIZER_DOMAIN));
@@ -1020,7 +1102,7 @@ class _ui_io_resizer extends _ui_io_base {
 	 *
 	 * Called after `wp_generate_attachment_metadata` is completed.
 	 */
-	public static function resize_from_meta_data($meta, $ID = null) {
+	function resize_from_meta_data($meta, $ID = null) {
 		if( defined( '_DISABLE_UI_IO' ) || defined( '_DISABLE_CW_IO_ADAPTED') || defined( 'DISABLE_CW_IO_ADAPTED') ) {
 			return $meta;
 		}
@@ -1069,13 +1151,17 @@ class _ui_io_resizer extends _ui_io_base {
 	 * Return the filesize in a humanly readable format.
 	 * Taken from http://www.php.net/manual/en/function.filesize.php#91477
 	 */
-	function _format_bytes($bytes, $precision = 2) {
+	public static function format_bytes($bytes, $precision = 2) {
 		$units = array('B', 'KB', 'MB', 'GB', 'TB');
 		$bytes = max($bytes, 0);
 		$pow = floor(($bytes ? log($bytes) : 0) / log(1024));
 		$pow = min($pow, count($units) - 1);
 		$bytes /= pow(1024, $pow);
 		return round($bytes, $precision) . ' ' . $units[$pow];
+	}
+	
+	function _format_bytes( $bytes, $precision = 2 ) {
+		return self::format_bytes( $bytes, $precision );
 	}
 }
 
