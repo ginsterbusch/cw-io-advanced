@@ -53,7 +53,7 @@ These instructions were tested with littleutils 1.0.36 and Linux Mint 17.3 aka U
 1. Configure and compile littleutils: *./configure --prefix=/usr && make*
 1. Install littleutils: *make install && make install-extra*
 
-= Installing littleutils: CentOS 6.0 (32-bit) =
+= Installing littleutils: CentOS 6.x (32-bit) =
 
 These instructions were tested with littleutils 1.0.27 and CentOS 6.0 (32-bit, "Basic server" configuration).
 
@@ -63,6 +63,17 @@ These instructions were tested with littleutils 1.0.27 and CentOS 6.0 (32-bit, "
 1. Download the latest version of [littleutils](http://sourceforge.net/projects/littleutils/): *cd /usr/local/src; wget http://downloads.sourceforge.net/project/littleutils/littleutils/1.0.27/littleutils-1.0.27.tar.bz2?r=http%3A%2F%2Fsourceforge.net%2Fprojects%2Flittleutils%2F*
 1. Uncompress littleutils: *tar jxvf littleutils-1.0.27.tar.bz2 && cd littleutils-1.0.27*
 1. Configure and install littleutils: *./configure --prefix=/usr && make && make install && make install-extra*
+
+= Installing ImageMagick: Linux =
+
+In almost any distribution which uses some kind of packaging tool, manager or package repository, there should be a stable release of ImageMagick around.
+
+The following list displays the respective packages in GNU/Debian, Ubuntu, Linux Mint and CentOS:
+
+* GNU/Debian, Ubuntu, Linux Mint: `imagemagick` - install using `apt-get install imagemagick` on console or open your favorite variation, eg. aptitude, synaptic etc. instead :)
+* CentOS, Fedora, Redhat Linux, Mandriva, Mageia: `ImageMagick` - install using `yum install ImageMagick`
+
+**BEWARE: GraphicsMagick is NOT the same as ImageMagick.** Yes, it is a fork, but its using slightly different program calls and parameters. There are plans to incorporate it as a fallback option as well.
 
 = Troubleshooting =
 
